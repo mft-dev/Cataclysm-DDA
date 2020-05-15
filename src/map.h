@@ -286,7 +286,7 @@ class map
             bool obstructed;
             float apparent_light;
         };
-        /** Helper function for light claculation; exposed here for map editor
+        /** Helper function for light calculation; exposed here for map editor
          */
         static apparent_light_info apparent_light_helper( const level_cache &map_cache,
                 const tripoint &p );
@@ -571,6 +571,12 @@ class map
         optional_vpart_position veh_at( const tripoint &p ) const;
         vehicle *veh_at_internal( const tripoint &p, int &part_num );
         const vehicle *veh_at_internal( const tripoint &p, int &part_num ) const;
+
+        // Checks if a move from -> to would be a diagonal move into or out of a vehicle
+        // i.e. will this move result in moving through a solid vehicle wall that happens to be placed diagonally
+        const bool veh_valid_diagonal_move( const tripoint &from, const tripoint &to ) const;
+        // Checks if a tile contains an impassable vehicle part. Returns the om_id of the vehicle if true
+        const bool has_impassable_veh_part( const tripoint &p, int &vehicle_id ) const;
         // Put player on vehicle at x,y
         void board_vehicle( const tripoint &p, player *pl );
         // Remove given passenger from given vehicle part.

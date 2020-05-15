@@ -242,7 +242,7 @@ bool monster::can_reach_to( const tripoint &p ) const
 
 bool monster::can_move_to( const tripoint &p ) const
 {
-    return can_reach_to( p ) && will_move_to( p );
+    return can_reach_to( p ) && will_move_to( p ) && g->m.veh_valid_diagonal_move( pos(), p );
 }
 
 void monster::set_dest( const tripoint &p )
@@ -892,9 +892,13 @@ void monster::move()
                     continue;
                 }
             }
-
             // A flag to allow non-stumbling critters to stumble when the most direct choice is bad.
             bool bad_choice = false;
+
+            if( !g->m.veh_valid_diagonal_move( pos(), candidate ) ) {
+                add_msg( _( "The %1$s claws helplessly at the vehicle!" ), name() );
+                continue;
+            }
 
             const Creature *target = g->critter_at( candidate, is_hallucination() );
             if( target != nullptr ) {

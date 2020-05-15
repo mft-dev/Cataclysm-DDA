@@ -1807,7 +1807,60 @@ bool map::valid_move( const tripoint &from, const tripoint &to,
 
     // Currently only furniture can block movement if everything else is OK
     // TODO: Vehicles with boards in the given spot
+    if( !veh_valid_diagonal_move( from, to ) ) {
+        return false;
+    }
+
     return up.get_furn_t().movecost >= 0;
+}
+
+const bool map::has_impassable_veh_part( const tripoint &p, int &vehicle_id ) const {
+    int part;
+    const vehicle *v = veh_at_internal( p, part );
+    if( v != nullptr ) {
+        const vpart_position vp( const_cast<vehicle &>( *v ), part );
+        if( vp.obstacle_at_part() ) {
+            vehicle_id = v->om_id;
+            return true;
+        }
+    }
+    return false;
+}
+
+const bool map::veh_valid_diagonal_move( const tripoint &from, const tripoint &to ) const {
+    // ensure diagonal, adjacent and on same z-level.
+    if( std::abs( from.x - to.x ) != 1 || std::abs( from.y - to.y ) != 1 || from.z != to.z )
+        return true;
+
+    if( from + tripoint_north_east == to ) {
+        int id_n;
+        int id_e;
+        if( has_impassable_veh_part( from + tripoint_north, id_n ) && has_impassable_veh_part( from + tripoint_east, id_e ) && id_n == id_e ) {
+            return false;
+        }
+    }
+    else if( from + tripoint_north_west == to ) {
+        int id_n;
+        int id_w;
+        if( has_impassable_veh_part( from + tripoint_north, id_n ) && has_impassable_veh_part( from + tripoint_west, id_w ) && id_n == id_w ) {
+            return false;
+        }
+    }
+    else if( from + tripoint_south_east == to ) {
+        int id_s;
+        int id_e;
+        if( has_impassable_veh_part( from + tripoint_south, id_s ) && has_impassable_veh_part( from + tripoint_east, id_e ) && id_s == id_e ) {
+            return false;
+        }
+    }
+    else if( from + tripoint_south_west == to ) {
+        int id_s;
+        int id_w;
+        if( has_impassable_veh_part( from + tripoint_south, id_s ) && has_impassable_veh_part( from + tripoint_west, id_w ) && id_s == id_w ) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // End of move cost
@@ -6245,7 +6298,9 @@ bool map::clear_path( const tripoint &f, const tripoint &t, const int range,
             if( new_point.x == t.x && new_point.y == t.y ) {
                 return false;
             }
-
+            if( !veh_valid_diagonal_move( tripoint( new_point, t.z ), t ) ) {
+                return false;
+            }
             const int cost = this->move_cost( new_point );
             if( cost < cost_min || cost > cost_max ) {
                 is_clear = false;
