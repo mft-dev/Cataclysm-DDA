@@ -450,7 +450,9 @@ void Item_factory::finalize_pre( itype &obj )
     }
 
     if( obj.longest_side == -1_mm ) {
-        obj.longest_side = units::cube_to_volume<int>( obj.volume );
+        units::volume effective_volume = obj.count_by_charges() ?
+                                         ( obj.volume / obj.stack_size ) : obj.volume;
+        obj.longest_side = units::default_length_from_volume<int>( effective_volume );
     }
 }
 
@@ -677,8 +679,7 @@ class iuse_function_wrapper : public iuse_actor
 
         ~iuse_function_wrapper() override = default;
         int use( player &p, item &it, bool a, const tripoint &pos ) const override {
-            iuse tmp;
-            return ( tmp.*cpp_function )( &p, &it, a, pos );
+            return cpp_function( &p, &it, a, pos );
         }
         std::unique_ptr<iuse_actor> clone() const override {
             return std::make_unique<iuse_function_wrapper>( *this );
