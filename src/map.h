@@ -574,7 +574,9 @@ class map
 
         // Checks if a move from -> to would be a diagonal move into or out of a vehicle
         // i.e. will this move result in moving through a solid vehicle wall that happens to be placed diagonally
-        const bool veh_valid_diagonal_move( const tripoint &from, const tripoint &to ) const;
+        // It does NOT check whether a vehicle is blocking transition from -> to in all cases, only when the two
+        // points are on a diagonal
+        const bool is_path_blocked_by_vehicle( const tripoint &from, const tripoint &to ) const;
         // Checks if a tile contains an impassable vehicle part. Returns the om_id of the vehicle if true
         const bool has_impassable_veh_part( const tripoint &p, int &vehicle_id ) const;
         // Put player on vehicle at x,y

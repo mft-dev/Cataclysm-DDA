@@ -98,6 +98,11 @@ bool avatar_action::move( avatar &you, map &m, const tripoint &d )
         }
         return false;
     }
+
+    if( m.is_path_blocked_by_vehicle( you.pos(), you.pos() + d ) ) {
+        return false;
+    }
+
     const bool is_riding = you.is_mounted();
     tripoint dest_loc;
     if( d.z == 0 && you.has_effect( effect_stunned ) ) {
@@ -459,7 +464,9 @@ bool avatar_action::ramp_move( avatar &you, map &m, const tripoint &dest_loc )
         // No recursive ramp_moves
         return false;
     }
-
+    if( m.is_path_blocked_by_vehicle( you.pos(), dest_loc ) ) {
+        return false;
+    }
     // We're moving onto a tile with no support, check if it has a ramp below
     if( !m.has_floor_or_support( dest_loc ) ) {
         tripoint below( dest_loc.xy(), dest_loc.z - 1 );

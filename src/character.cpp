@@ -10444,11 +10444,13 @@ std::vector<Creature *> Character::get_targetable_creatures( const int range ) c
         if( can_see )   //handles the case where we can see something with glass in the way or a mutation lets us see through walls
         {
             std::vector<tripoint> path = g->m.find_clear_path( pos(), critter.pos() );
+            tripoint &prev = tripoint( pos() );
             for( const tripoint &point : path ) {
-                if( g->m.impassable( point ) ) {
+                if( g->m.impassable( point ) || g->m.is_path_blocked_by_vehicle( prev, point ) ) {
                     can_see = false;
                     break;
                 }
+                prev = point;
             }
         }
         bool in_range = std::round( rl_dist_exact( pos(), critter.pos() ) ) <= range;

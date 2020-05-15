@@ -2672,7 +2672,7 @@ bool mattack::grab( monster *z )
         return false;
     }
     Creature *target = z->attack_target();
-    if( target == nullptr || !is_adjacent( z, target, false ) || !g->m.veh_valid_diagonal_move( z->pos(), target->pos() ) ) {
+    if( target == nullptr || !is_adjacent( z, target, false ) || g->m.is_path_blocked_by_vehicle( z->pos(), target->pos() ) ) {
         return false;
     }
 
