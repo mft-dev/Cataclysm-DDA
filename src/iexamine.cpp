@@ -98,6 +98,7 @@ static const activity_id ACT_BUILD( "ACT_BUILD" );
 static const activity_id ACT_CLEAR_RUBBLE( "ACT_CLEAR_RUBBLE" );
 static const activity_id ACT_CRACKING( "ACT_CRACKING" );
 static const activity_id ACT_FORAGE( "ACT_FORAGE" );
+static const activity_id ACT_OPERATION( "ACT_OPERATION" );
 static const activity_id ACT_PLANT_SEED( "ACT_PLANT_SEED" );
 
 static const efftype_id effect_earphones( "earphones" );
@@ -138,8 +139,10 @@ static const trait_id trait_THRESH_MYCUS( "THRESH_MYCUS" );
 static const quality_id qual_ANESTHESIA( "ANESTHESIA" );
 static const quality_id qual_DIG( "DIG" );
 
+static const mtype_id mon_broken_cyborg( "mon_broken_cyborg" );
 static const mtype_id mon_dark_wyrm( "mon_dark_wyrm" );
 static const mtype_id mon_fungal_blossom( "mon_fungal_blossom" );
+static const mtype_id mon_prototype_cyborg( "mon_prototype_cyborg" );
 static const mtype_id mon_spider_cellar_giant_s( "mon_spider_cellar_giant_s" );
 static const mtype_id mon_spider_web_s( "mon_spider_web_s" );
 static const mtype_id mon_spider_widow_giant_s( "mon_spider_widow_giant_s" );
@@ -4349,7 +4352,7 @@ static item &cyborg_on_couch( const tripoint &couch_pos, item &null_cyborg )
             return it;
         }
         if( it.typeId() == "corpse" ) {
-            if( it.get_mtype()->id == "mon_broken_cyborg" || it.get_mtype()->id == "mon_prototype_cyborg" ) {
+            if( it.get_mtype()->id == mon_broken_cyborg || it.get_mtype()->id == mon_prototype_cyborg ) {
                 return it;
             }
         }
@@ -4359,38 +4362,31 @@ static item &cyborg_on_couch( const tripoint &couch_pos, item &null_cyborg )
 
 static player &best_installer( player &p, player &null_player, int difficulty )
 {
-    float player_skill = p.bionics_adjusted_skill( skill_firstaid,
-                         skill_computer,
-                         skill_electronics );
-
-    std::vector< std::pair<float, int>> ally_skills;
-    ally_skills.reserve( g->allies().size() );
+    std::vector< std::pair<int, int>> ally_chances;
+    ally_chances.reserve( g->allies().size() );
     for( size_t i = 0; i < g->allies().size() ; i ++ ) {
-        std::pair<float, int> ally_skill;
+        std::pair<int, int> ally_skill;
         const npc *e = g->allies()[ i ];
 
         player &ally = *g->critter_by_id<player>( e->getID() );
         ally_skill.second = i;
-        ally_skill.first = ally.bionics_adjusted_skill( skill_firstaid,
-                           skill_computer,
-                           skill_electronics );
-        ally_skills.push_back( ally_skill );
+        ally_skill.first = bionic_success_chance( true, -1, difficulty, ally );
+        ally_chances.push_back( ally_skill );
     }
-    std::sort( ally_skills.begin(), ally_skills.end(), [&]( const std::pair<float, int> &lhs,
-    const std::pair<float, int> &rhs ) {
+    std::sort( ally_chances.begin(), ally_chances.end(), [&]( const std::pair<int, int> &lhs,
+    const std::pair<int, int> &rhs ) {
         return rhs.first < lhs.first;
     } );
-    int player_cos = bionic_manip_cos( player_skill, difficulty );
+    int player_cos = bionic_success_chance( true, -1, difficulty, p );
     for( size_t i = 0; i < g->allies().size() ; i ++ ) {
-        if( ally_skills[ i ].first > player_skill ) {
-            const npc *e = g->allies()[ ally_skills[ i ].second ];
+        if( ally_chances[ i ].first > player_cos ) {
+            const npc *e = g->allies()[ ally_chances[ i ].second ];
             player &ally = *g->critter_by_id<player>( e->getID() );
-            int ally_cos = bionic_manip_cos( ally_skills[ i ].first, difficulty );
             if( e->has_effect( effect_sleep ) ) {
                 if( !g->u.query_yn(
                         //~ %1$s is the name of the ally
                         _( "<color_white>%1$s is asleep, but has a <color_green>%2$d<color_white> chance of success compared to your <color_red>%3$d<color_white> chance of success.  Continue with a higher risk of failure?</color>" ),
-                        ally.disp_name(), ally_cos, player_cos ) ) {
+                        ally.disp_name(), ally_chances[i].first, player_cos ) ) {
                     return null_player;
                 } else {
                     continue;
@@ -4398,7 +4394,7 @@ static player &best_installer( player &p, player &null_player, int difficulty )
             }
             //~ %1$s is the name of the ally
             add_msg( _( "%1$s will perform the operation with a %2$d chance of success." ), ally.disp_name(),
-                     ally_cos );
+                     ally_chances[i].first );
             return ally;
         } else {
             break;
@@ -4484,7 +4480,7 @@ void iexamine::autodoc( player &p, const tripoint &examp )
             popup( _( "No patient found located on the connected couches.  Operation impossible.  Exiting." ) );
             return;
         }
-    } else if( patient.activity.id() == "ACT_OPERATION" ) {
+    } else if( patient.activity.id() == ACT_OPERATION ) {
         popup( _( "Operation underway.  Please wait until the end of the current procedure.  Estimated time remaining: %s." ),
                to_string( time_duration::from_turns( patient.activity.moves_left / 100 ) ) );
         p.add_msg_if_player( m_info, _( "The autodoc is working on %s." ), patient.disp_name() );

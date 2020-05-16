@@ -920,7 +920,8 @@ void avatar_action::aim_do_turn( avatar &you, map &m )
         bool not_aiming = you.activity.id() != ACT_AIM;
         if( not_aiming && gun->has_flag( flag_RELOAD_AND_SHOOT ) ) {
             const auto previous_moves = you.moves;
-            g->unload( *gun );
+            item_location loc = item_location( you, gun.target );
+            g->unload( loc );
             // Give back time for unloading as essentially nothing has been done.
             // Note that reload_time has not been applied either.
             you.moves = previous_moves;
@@ -1278,13 +1279,5 @@ void avatar_action::unload( avatar &you )
         return;
     }
 
-    item *it = loc.get_item();
-    if( loc.where() != item_location::type::character ) {
-        it = loc.obtain( you ).get_item();
-    }
-    if( you.unload( *it ) ) {
-        if( it->has_flag( "MAG_DESTROY" ) && it->ammo_remaining() == 0 ) {
-            you.remove_item( *it );
-        }
-    }
+    you.unload( loc );
 }
