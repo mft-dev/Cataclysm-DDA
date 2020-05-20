@@ -6,6 +6,7 @@
 #include "activity_handlers.h" // put_into_vehicle_or_drop and drop_on_map
 #include "advanced_inv.h"
 #include "avatar.h"
+#include "avatar_action.h"
 #include "character.h"
 #include "computer_session.h"
 #include "debug.h"
@@ -587,7 +588,29 @@ std::unique_ptr<activity_actor> open_gate_activity_actor::deserialize( JsonIn &j
 
 void consume_activity_actor::start( player_activity &act, Character &guy )
 {
-    int moves = to_moves<int>( guy.get_consume_time( *loc ) );
+    int moves;
+    if( consume_location ) {
+        const auto ret = g->u.will_eat( *consume_location, true );
+        if( !ret.success() ) {
+            open_consume_menu = false;
+            return;
+        } else {
+            force = true;
+        }
+        moves = to_moves<int>( guy.get_consume_time( *consume_location ) );
+    } else if( !consume_item.is_null() ) {
+        const auto ret = g->u.will_eat( consume_item, true );
+        if( !ret.success() ) {
+            open_consume_menu = false;
+            return;
+        } else {
+            force = true;
+        }
+        moves = to_moves<int>( guy.get_consume_time( consume_item ) );
+    } else {
+        debugmsg( "Item/location to be consumed should not be null." );
+        return;
+    }
 
     act.moves_total = moves;
     act.moves_left = moves;
@@ -595,22 +618,34 @@ void consume_activity_actor::start( player_activity &act, Character &guy )
 
 void consume_activity_actor::finish( player_activity &act, Character & )
 {
-    if( loc.where() == item_location::type::character ) {
-        g->u.consume( loc );
-    } else if( g->u.consume_item( *loc ) ) {
-        loc.remove_item();
-    }
-    if( g->u.get_value( "THIEF_MODE_KEEP" ) != "YES" ) {
-        g->u.set_value( "THIEF_MODE", "THIEF_ASK" );
+    if( consume_location ) {
+        if( consume_location.where() == item_location::type::character ) {
+            g->u.consume( consume_location, force );
+        } else if( g->u.consume( *consume_location, force ) ) {
+            consume_location.remove_item();
+        }
+        if( g->u.get_value( "THIEF_MODE_KEEP" ) != "YES" ) {
+            g->u.set_value( "THIEF_MODE", "THIEF_ASK" );
+        }
+    } else if( !consume_item.is_null() ) {
+        g->u.consume( consume_item, force );
+    } else {
+        debugmsg( "Item location/name to be consumed should not be null." );
     }
     act.set_to_null();
+    if( open_consume_menu ) {
+        avatar_action::eat( g->u );
+    }
 }
 
 void consume_activity_actor::serialize( JsonOut &jsout ) const
 {
     jsout.start_object();
 
-    jsout.member( "loc", loc );
+    jsout.member( "consume_location", consume_location );
+    jsout.member( "consume_item", consume_item );
+    jsout.member( "open_consume_menu", open_consume_menu );
+    jsout.member( "force", force );
 
     jsout.end_object();
 }
@@ -622,7 +657,10 @@ std::unique_ptr<activity_actor> consume_activity_actor::deserialize( JsonIn &jsi
 
     JsonObject data = jsin.get_object();
 
-    data.read( "loc", actor.loc );
+    data.read( "consume_location", actor.consume_location );
+    data.read( "consume_item", actor.consume_item );
+    data.read( "open_consume_menu", actor.open_consume_menu );
+    data.read( "force", actor.force );
 
     return actor.clone();
 }

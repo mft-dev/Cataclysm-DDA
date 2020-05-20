@@ -1611,10 +1611,9 @@ static bool can_drink_nectar( const player &p )
 static bool drink_nectar( player &p )
 {
     if( can_drink_nectar( p ) ) {
-        p.moves -= to_moves<int>( 30_seconds );
         add_msg( _( "You drink some nectar." ) );
         item nectar( "nectar", calendar::turn, 1 );
-        p.eat( nectar );
+        p.assign_activity( player_activity( consume_activity_actor( nectar, false ) ) );
         return true;
     }
 
@@ -1655,10 +1654,9 @@ void iexamine::flower_poppy( player &p, const tripoint &examp )
                        g->m.furnname( examp ) ) ) {
             return;
         }
-        p.moves -= to_moves<int>( 30_seconds ); // You take your time...
         add_msg( _( "You slowly suck up the nectar." ) );
         item poppy( "poppy_nectar", calendar::turn, 1 );
-        p.eat( poppy );
+        p.assign_activity( player_activity( consume_activity_actor( poppy, false ) ) );
         p.mod_fatigue( 20 );
         p.add_effect( effect_pkill2, 7_minutes );
         // Please drink poppy nectar responsibly.
@@ -3133,16 +3131,15 @@ void iexamine::keg( player &p, const tripoint &examp )
                 return;
 
             case HAVE_A_DRINK:
-                if( !p.eat( drink ) ) {
+                if( !p.can_consume( drink ) ) {
                     return; // They didn't actually drink
                 }
-
+                p.assign_activity( player_activity( consume_activity_actor( drink, false ) ) );
                 if( drink.charges == 0 ) {
                     add_msg( _( "You squeeze the last drops of %1$s from the %2$s." ),
                              drink_tname, keg_name );
                     g->m.i_clear( examp );
                 }
-                p.moves -= to_moves<int>( 5_seconds );
                 return;
 
             case REFILL: {
@@ -4442,7 +4439,7 @@ void iexamine::autodoc( player &p, const tripoint &examp )
                 popup( _( "Patient is dead.  Please remove corpse to proceed.  Exiting." ) );
                 return;
             } else if( cyborg.typeId() == "bot_broken_cyborg" || cyborg.typeId() == "corpse" ) {
-                popup( _( "ERROR Bionic Level Assessement: FULL CYBORG.  Autodoc Mk. XI can't opperate.  Please move patient to appropriate facility.  Exiting." ) );
+                popup( _( "ERROR Bionic Level Assessment: FULL CYBORG.  Autodoc Mk. XI can't operate.  Please move patient to appropriate facility.  Exiting." ) );
                 return;
             }
 
@@ -4628,8 +4625,8 @@ void iexamine::autodoc( player &p, const tripoint &examp )
             int broken_limbs_count = 0;
             for( int i = 0; i < num_hp_parts; i++ ) {
                 const bool broken = patient.is_limb_broken( static_cast<hp_part>( i ) );
-                body_part part = player::hp_to_bp( static_cast<hp_part>( i ) );
-                effect &existing_effect = patient.get_effect( effect_mending, part );
+                const bodypart_id &part = convert_bp( player::hp_to_bp( static_cast<hp_part>( i ) ) ).id();
+                effect &existing_effect = patient.get_effect( effect_mending, part->token );
                 // Skip part if not broken or already healed 50%
                 if( !broken || ( !existing_effect.is_null() &&
                                  existing_effect.get_duration() >
@@ -4642,7 +4639,7 @@ void iexamine::autodoc( player &p, const tripoint &examp )
                                                _( "The machine rapidly sets and splints <npcname>'s broken %s." ),
                                                body_part_name( part ) );
                 // TODO: fail here if unable to perform the action, i.e. can't wear more, trait mismatch.
-                if( !patient.worn_with_flag( flag_SPLINT, convert_bp( part ).id() ) ) {
+                if( !patient.worn_with_flag( flag_SPLINT, part ) ) {
                     item splint;
                     if( i == hp_arm_l || i == hp_arm_r ) {
                         splint = item( "arm_splint", 0 );
@@ -4653,8 +4650,8 @@ void iexamine::autodoc( player &p, const tripoint &examp )
                     cata::optional<std::list<item>::iterator> worn_item =
                         patient.wear( equipped_splint, false );
                 }
-                patient.add_effect( effect_mending, 0_turns, part, true );
-                effect &mending_effect = patient.get_effect( effect_mending, part );
+                patient.add_effect( effect_mending, 0_turns, part->token, true );
+                effect &mending_effect = patient.get_effect( effect_mending, part->token );
                 mending_effect.set_duration( mending_effect.get_max_duration() - 5_days );
             }
             if( broken_limbs_count == 0 ) {

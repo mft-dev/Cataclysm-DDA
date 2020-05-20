@@ -137,14 +137,23 @@ static const efftype_id effect_heating_bionic( "heating_bionic" );
 static const efftype_id effect_heavysnare( "heavysnare" );
 static const efftype_id effect_hot( "hot" );
 static const efftype_id effect_hot_speed( "hot_speed" );
+static const efftype_id effect_hunger_blank( "hunger_blank" );
+static const efftype_id effect_hunger_engorged( "hunger_engorged" );
+static const efftype_id effect_hunger_famished( "hunger_famished" );
+static const efftype_id effect_hunger_full( "hunger_full" );
+static const efftype_id effect_hunger_hungry( "hunger_hungry" );
+static const efftype_id effect_hunger_near_starving( "hunger_near_starving" );
+static const efftype_id effect_hunger_satisfied( "hunger_satisfied" );
+static const efftype_id effect_hunger_starving( "hunger_starving" );
+static const efftype_id effect_hunger_very_hungry( "hunger_very_hungry" );
 static const efftype_id effect_in_pit( "in_pit" );
 static const efftype_id effect_infected( "infected" );
 static const efftype_id effect_jetinjector( "jetinjector" );
 static const efftype_id effect_lack_sleep( "lack_sleep" );
 static const efftype_id effect_lightsnare( "lightsnare" );
 static const efftype_id effect_lying_down( "lying_down" );
-static const efftype_id effect_melatonin_supplements( "melatonin" );
 static const efftype_id effect_masked_scent( "masked_scent" );
+static const efftype_id effect_melatonin_supplements( "melatonin" );
 static const efftype_id effect_mending( "mending" );
 static const efftype_id effect_narcosis( "narcosis" );
 static const efftype_id effect_nausea( "nausea" );
@@ -220,7 +229,6 @@ static const bionic_id bio_tattoo_led( "bio_tattoo_led" );
 static const bionic_id bio_tools( "bio_tools" );
 static const bionic_id bio_ups( "bio_ups" );
 static const bionic_id str_bio_cloak( "bio_cloak" );
-static const bionic_id str_bio_night( "bio_night" );
 // Aftershock stuff!
 static const bionic_id afs_bio_linguistic_coprocessor( "afs_bio_linguistic_coprocessor" );
 
@@ -2109,10 +2117,10 @@ cata::optional<std::list<item>::iterator> Character::wear_item( const item &to_w
             to_wear.tname() );
         moves -= item_wear_cost( to_wear );
 
-        for( const body_part bp : all_body_parts ) {
-            if( to_wear.covers( bp ) && encumb( bp ) >= 40 ) {
+        for( const bodypart_id &bp : get_all_body_parts() ) {
+            if( to_wear.covers( bp->token ) && encumb( bp->token ) >= 40 ) {
                 add_msg_if_player( m_warning,
-                                   bp == bp_eyes ?
+                                   bp == bodypart_id( "eyes" ) ?
                                    _( "Your %s are very encumbered!  %s" ) : _( "Your %s is very encumbered!  %s" ),
                                    body_part_name( bp ), encumb_text( bp ) );
             }
@@ -4264,64 +4272,23 @@ std::pair<std::string, nc_color> Character::get_thirst_description() const
 
 std::pair<std::string, nc_color> Character::get_hunger_description() const
 {
-    const bool calorie_deficit = get_bmi() < character_weight_category::normal;
-    const units::volume contains = stomach.contains();
-    const units::volume cap = stomach.capacity( *this );
-    std::string hunger_string;
-    nc_color hunger_color = c_white;
-    // i ate just now!
-    const bool just_ate = stomach.time_since_ate() < 15_minutes;
-    // i ate a meal recently enough that i shouldn't need another meal
-    const bool recently_ate = stomach.time_since_ate() < 3_hours;
-    if( calorie_deficit ) {
-        if( contains >= cap ) {
-            hunger_string = _( "Engorged" );
-            hunger_color = c_green;
-        } else if( contains > cap * 3 / 4 ) {
-            hunger_string = _( "Sated" );
-            hunger_color = c_green;
-        } else if( just_ate && contains > cap / 2 ) {
-            hunger_string = _( "Full" );
-            hunger_color = c_green;
-        } else if( just_ate ) {
-            hunger_string = _( "Hungry" );
-            hunger_color = c_yellow;
-        } else if( recently_ate ) {
-            hunger_string = _( "Very Hungry" );
-            hunger_color = c_yellow;
-        } else if( get_bmi() < character_weight_category::emaciated ) {
-            hunger_string = _( "Starving!" );
-            hunger_color = c_red;
-        } else if( get_bmi() < character_weight_category::underweight ) {
-            hunger_string = _( "Near starving" );
-            hunger_color = c_red;
-        } else {
-            hunger_string = _( "Famished" );
-            hunger_color = c_light_red;
-        }
-    } else {
-        if( contains >= cap * 5 / 6 ) {
-            hunger_string = _( "Engorged" );
-            hunger_color = c_green;
-        } else if( contains > cap * 11 / 20 ) {
-            hunger_string = _( "Sated" );
-            hunger_color = c_green;
-        } else if( recently_ate && contains >= cap * 3 / 8 ) {
-            hunger_string = _( "Full" );
-            hunger_color = c_green;
-        } else if( !just_ate && ( recently_ate || contains > 0_ml ) ) {
-            hunger_string.clear();
-        } else {
-            if( get_bmi() > character_weight_category::overweight ) {
-                hunger_string = _( "Hungry" );
-            } else {
-                hunger_string = _( "Very Hungry" );
-            }
-            hunger_color = c_yellow;
+    std::map<efftype_id, std::pair<std::string, nc_color> > hunger_states = {
+        { effect_hunger_engorged, std::make_pair( _( "Engorged" ), c_red ) },
+        { effect_hunger_full, std::make_pair( _( "Full" ), c_yellow ) },
+        { effect_hunger_satisfied, std::make_pair( _( "Satisfied" ), c_green ) },
+        { effect_hunger_blank, std::make_pair( _( "" ), c_white ) },
+        { effect_hunger_hungry, std::make_pair( _( "Hungry" ), c_yellow ) },
+        { effect_hunger_very_hungry, std::make_pair( _( "Very Hungry" ), c_yellow ) },
+        { effect_hunger_near_starving, std::make_pair( _( "Near starving" ), c_red ) },
+        { effect_hunger_starving, std::make_pair( _( "Starving!" ), c_red ) },
+        { effect_hunger_famished, std::make_pair( _( "Famished" ), c_light_red ) }
+    };
+    for( auto &hunger_state : hunger_states ) {
+        if( has_effect( hunger_state.first ) ) {
+            return hunger_state.second;
         }
     }
-
-    return std::make_pair( hunger_string, hunger_color );
+    return std::make_pair( _( "ERROR!" ), c_light_red );
 }
 
 std::pair<std::string, nc_color> Character::get_fatigue_description() const
@@ -4491,17 +4458,17 @@ void Character::regen( int rate_multiplier )
 
     // include healing effects
     for( int i = 0; i < num_hp_parts; i++ ) {
-        body_part bp = hp_to_bp( static_cast<hp_part>( i ) );
-        float healing = healing_rate_medicine( rest, convert_bp( bp ).id() ) * to_turns<int>( 5_minutes );
+        const bodypart_id &bp = convert_bp( hp_to_bp( static_cast<hp_part>( i ) ) ).id();
+        float healing = healing_rate_medicine( rest, bp ) * to_turns<int>( 5_minutes );
 
         int healing_apply = roll_remainder( healing );
         healed_bp( i, healing_apply );
-        heal( bp, healing_apply );
+        heal( bp->token, healing_apply );
         if( damage_bandaged[i] > 0 ) {
             damage_bandaged[i] -= healing_apply;
             if( damage_bandaged[i] <= 0 ) {
                 damage_bandaged[i] = 0;
-                remove_effect( effect_bandaged, bp );
+                remove_effect( effect_bandaged, bp->token );
                 add_msg_if_player( _( "Bandaged wounds on your %s healed." ), body_part_name( bp ) );
             }
         }
@@ -4509,20 +4476,20 @@ void Character::regen( int rate_multiplier )
             damage_disinfected[i] -= healing_apply;
             if( damage_disinfected[i] <= 0 ) {
                 damage_disinfected[i] = 0;
-                remove_effect( effect_disinfected, bp );
+                remove_effect( effect_disinfected, bp->token );
                 add_msg_if_player( _( "Disinfected wounds on your %s healed." ), body_part_name( bp ) );
             }
         }
 
         // remove effects if the limb was healed by other way
-        if( has_effect( effect_bandaged, bp ) && ( hp_cur[i] == hp_max[i] ) ) {
+        if( has_effect( effect_bandaged, bp->token ) && ( hp_cur[i] == hp_max[i] ) ) {
             damage_bandaged[i] = 0;
-            remove_effect( effect_bandaged, bp );
+            remove_effect( effect_bandaged, bp->token );
             add_msg_if_player( _( "Bandaged wounds on your %s healed." ), body_part_name( bp ) );
         }
-        if( has_effect( effect_disinfected, bp ) && ( hp_cur[i] == hp_max[i] ) ) {
+        if( has_effect( effect_disinfected, bp->token ) && ( hp_cur[i] == hp_max[i] ) ) {
             damage_disinfected[i] = 0;
-            remove_effect( effect_disinfected, bp );
+            remove_effect( effect_disinfected, bp->token );
             add_msg_if_player( _( "Disinfected wounds on your %s healed." ), body_part_name( bp ) );
         }
     }
@@ -4697,7 +4664,7 @@ void Character::update_stomach( const time_point &from, const time_point &to )
             // you're engorged! your stomach is full to bursting!
             set_hunger( -61 );
         } else if( stomach.contains() >= stomach_capacity / 2 && get_hunger() > -21 ) {
-            // sated
+            // full
             set_hunger( -21 );
         } else if( stomach.contains() >= stomach_capacity / 8 && get_hunger() > -1 ) {
             // that's really all the food you need to feel full
@@ -4722,7 +4689,7 @@ void Character::update_stomach( const time_point &from, const time_point &to )
             // you're engorged! your stomach is full to bursting!
             set_hunger( -61 );
         } else if( stomach.contains() >= stomach_capacity * 3 / 4 && get_hunger() > -21 ) {
-            // sated
+            // full
             set_hunger( -21 );
         } else if( stomach.contains() >= stomach_capacity / 2 && get_hunger() > -1 ) {
             // that's really all the food you need to feel full
@@ -4740,6 +4707,63 @@ void Character::update_stomach( const time_point &from, const time_point &to )
     // since water is not limited by intake but by absorption, we can just set thirst to zero
     if( mycus || mouse ) {
         set_thirst( 0 );
+    }
+
+    const bool calorie_deficit = get_bmi() < character_weight_category::normal;
+    const units::volume contains = stomach.contains();
+    const units::volume cap = stomach.capacity( *this );
+
+    efftype_id hunger_effect;
+    // i ate just now!
+    const bool just_ate = stomach.time_since_ate() < 15_minutes;
+    // i ate a meal recently enough that i shouldn't need another meal
+    const bool recently_ate = stomach.time_since_ate() < 3_hours;
+    if( calorie_deficit ) {
+        if( contains >= cap ) {
+            hunger_effect = effect_hunger_engorged;
+        } else if( contains > cap * 3 / 4 ) {
+            hunger_effect = effect_hunger_full;
+        } else if( just_ate && contains > cap / 2 ) {
+            hunger_effect = effect_hunger_satisfied;
+        } else if( just_ate ) {
+            hunger_effect = effect_hunger_hungry;
+        } else if( recently_ate ) {
+            hunger_effect = effect_hunger_very_hungry;
+        } else if( get_bmi() < character_weight_category::underweight ) {
+            hunger_effect = effect_hunger_near_starving;
+        } else if( get_bmi() < character_weight_category::emaciated ) {
+            hunger_effect = effect_hunger_starving;
+        } else {
+            hunger_effect = effect_hunger_famished;
+        }
+    } else {
+        if( contains >= cap * 5 / 6 ) {
+            hunger_effect = effect_hunger_engorged;
+        } else if( contains > cap * 11 / 20 ) {
+            hunger_effect = effect_hunger_full;
+        } else if( recently_ate && contains >= cap * 3 / 8 ) {
+            hunger_effect = effect_hunger_satisfied;
+        } else if( !just_ate && ( recently_ate || contains > 0_ml ) ) {
+            hunger_effect = effect_hunger_blank;
+        } else {
+            if( get_bmi() > character_weight_category::overweight ) {
+                hunger_effect = effect_hunger_hungry;
+            } else {
+                hunger_effect = effect_hunger_very_hungry;
+            }
+        }
+    }
+    if( !has_effect( hunger_effect ) ) {
+        remove_effect( effect_hunger_engorged );
+        remove_effect( effect_hunger_full );
+        remove_effect( effect_hunger_satisfied );
+        remove_effect( effect_hunger_hungry );
+        remove_effect( effect_hunger_very_hungry );
+        remove_effect( effect_hunger_near_starving );
+        remove_effect( effect_hunger_starving );
+        remove_effect( effect_hunger_famished );
+        remove_effect( effect_hunger_blank );
+        add_effect( hunger_effect, 24_hours, num_bp, true );
     }
 }
 
@@ -5317,7 +5341,7 @@ void Character::update_bodytemp()
     // Current temperature and converging temperature calculations
     for( const bodypart_id &bp : get_all_body_parts() ) {
         // Skip eyes
-        if( bp == bodypart_id( "eyes" ) || bp == bodypart_id( "num_bp" ) ) {
+        if( bp == bodypart_id( "eyes" ) ) {
             continue;
         }
 
@@ -5635,7 +5659,7 @@ void Character::update_bodytemp()
                 }
                 if( one_in( 100 ) && !has_effect( effect_frostbite, bp->token ) ) {
                     add_msg( m_warning, _( "Your %s will be frostnipped in the next few hours." ),
-                             body_part_name( bp->token ) );
+                             body_part_name( bp ) );
                 }
                 // Medium risk zones
             } else if( temp_cur[bp->token] < BODYTEMP_COLD &&
@@ -5648,7 +5672,7 @@ void Character::update_bodytemp()
                 frostbite_timer[bp->token] += 8;
                 if( one_in( 100 ) && intense < 2 ) {
                     add_msg( m_warning, _( "Your %s will be frostbitten within the hour!" ),
-                             body_part_name( bp->token ) );
+                             body_part_name( bp ) );
                 }
                 // High risk zones
             } else if( temp_cur[bp->token] < BODYTEMP_COLD &&
@@ -5658,7 +5682,7 @@ void Character::update_bodytemp()
                 frostbite_timer[bp->token] += 72;
                 if( one_in( 100 ) && intense < 2 ) {
                     add_msg( m_warning, _( "Your %s will be frostbitten any minute now!" ),
-                             body_part_name( bp->token ) );
+                             body_part_name( bp ) );
                 }
                 // Risk free, so reduce frostbite timer
             } else {
@@ -5692,27 +5716,27 @@ void Character::update_bodytemp()
         if( temp_before > BODYTEMP_FREEZING && temp_after < BODYTEMP_FREEZING ) {
             //~ %s is bodypart
             add_msg( m_warning, _( "You feel your %s beginning to go numb from the cold!" ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         } else if( temp_before > BODYTEMP_VERY_COLD && temp_after < BODYTEMP_VERY_COLD ) {
             //~ %s is bodypart
             add_msg( m_warning, _( "You feel your %s getting very cold." ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         } else if( temp_before > BODYTEMP_COLD && temp_after < BODYTEMP_COLD ) {
             //~ %s is bodypart
             add_msg( m_warning, _( "You feel your %s getting chilly." ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         } else if( temp_before < BODYTEMP_SCORCHING && temp_after > BODYTEMP_SCORCHING ) {
             //~ %s is bodypart
             add_msg( m_bad, _( "You feel your %s getting red hot from the heat!" ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         } else if( temp_before < BODYTEMP_VERY_HOT && temp_after > BODYTEMP_VERY_HOT ) {
             //~ %s is bodypart
             add_msg( m_warning, _( "You feel your %s getting very hot." ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         } else if( temp_before < BODYTEMP_HOT && temp_after > BODYTEMP_HOT ) {
             //~ %s is bodypart
             add_msg( m_warning, _( "You feel your %s getting warm." ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         }
 
         // Note: Numbers are based off of BODYTEMP at the top of weather.h
@@ -5736,14 +5760,14 @@ void Character::update_bodytemp()
         // But only if it can be a problem, no need to spam player with "wind chills your scorching body"
         if( temp_conv[bp->token] <= BODYTEMP_COLD && windchill < -10 && one_in( 200 ) ) {
             add_msg( m_bad, _( "The wind is making your %s feel quite cold." ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         } else if( temp_conv[bp->token] <= BODYTEMP_COLD && windchill < -20 && one_in( 100 ) ) {
             add_msg( m_bad,
                      _( "The wind is very strong, you should find some more wind-resistant clothing for your %s." ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         } else if( temp_conv[bp->token] <= BODYTEMP_COLD && windchill < -30 && one_in( 50 ) ) {
             add_msg( m_bad, _( "Your clothing is not providing enough protection from the wind for your %s!" ),
-                     body_part_name( bp->token ) );
+                     body_part_name( bp ) );
         }
     }
 }
@@ -6716,17 +6740,13 @@ std::string Character::extended_description() const
     // accumulate looks weird here, any better function?
     int longest = std::accumulate( bps.begin(), bps.end(), 0,
     []( int m, bodypart_id bp ) {
-        return std::max( m, utf8_width( body_part_name_as_heading( bp->token, 1 ) ) );
+        return std::max( m, utf8_width( body_part_name_as_heading( bp, 1 ) ) );
     } );
 
     // This is a stripped-down version of the body_window function
     // This should be extracted into a separate function later on
     for( const bodypart_id bp : bps ) {
-        // Hide appendix from the player
-        if( bp->id.is_null() ) {
-            continue;
-        }
-        const std::string &bp_heading = body_part_name_as_heading( bp->token, 1 );
+        const std::string &bp_heading = body_part_name_as_heading( bp, 1 );
         hp_part hp = bp_to_hp( bp->token );
 
         const int maximal_hp = hp_max[hp];
@@ -7697,7 +7717,7 @@ int Character::item_handling_cost( const item &it, bool penalties, int base_cost
         mv += std::min( encumb( bp_hand_l ), encumb( bp_hand_r ) );
     }
 
-    return std::min( std::max( mv, 0 ), MAX_HANDLING_COST );
+    return std::max( mv, 0 );
 }
 
 int Character::item_store_cost( const item &it, const item & /* container */, bool penalties,
@@ -8543,7 +8563,7 @@ dealt_damage_instance Character::deal_damage( Creature *source, bodypart_id bp,
             SCT.add( point( posx(), posy() ),
                      direction_from( point_zero, point( posx() - source->posx(), posy() - source->posy() ) ),
                      get_hp_bar( dam, get_hp_max( player::bp_to_hp( bp->token ) ) ).first, m_bad,
-                     body_part_name( bp->token ), m_neutral );
+                     body_part_name( bp ), m_neutral );
         }
     }
 
@@ -8675,22 +8695,21 @@ dealt_damage_instance Character::deal_damage( Creature *source, bodypart_id bp,
 int Character::reduce_healing_effect( const efftype_id &eff_id, int remove_med,
                                       const bodypart_id &hurt )
 {
-    const body_part hurt_token = hurt->token;
-    effect &e = get_effect( eff_id, hurt_token );
+    effect &e = get_effect( eff_id, hurt->token );
     int intensity = e.get_intensity();
     if( remove_med < intensity ) {
         if( eff_id == effect_bandaged ) {
-            add_msg_if_player( m_bad, _( "Bandages on your %s were damaged!" ), body_part_name( hurt_token ) );
+            add_msg_if_player( m_bad, _( "Bandages on your %s were damaged!" ), body_part_name( hurt ) );
         } else  if( eff_id == effect_disinfected ) {
             add_msg_if_player( m_bad, _( "You got some filth on your disinfected %s!" ),
-                               body_part_name( hurt_token ) );
+                               body_part_name( hurt ) );
         }
     } else {
         if( eff_id == effect_bandaged ) {
             add_msg_if_player( m_bad, _( "Bandages on your %s were destroyed!" ),
-                               body_part_name( hurt_token ) );
+                               body_part_name( hurt ) );
         } else  if( eff_id == effect_disinfected ) {
-            add_msg_if_player( m_bad, _( "Your %s is no longer disinfected!" ), body_part_name( hurt_token ) );
+            add_msg_if_player( m_bad, _( "Your %s is no longer disinfected!" ), body_part_name( hurt ) );
         }
     }
     e.mod_duration( -6_hours * remove_med );
@@ -10680,11 +10699,7 @@ bool Character::sees( const tripoint &t, bool, int ) const
     if( wanted_range < MAX_CLAIRVOYANCE && wanted_range < clairvoyance() ) {
         return true;
     }
-    // Only check if we need to override if we already came to the opposite conclusion.
-    if( can_see && wanted_range < 15 && wanted_range > sight_range( 1 ) &&
-        has_active_bionic( str_bio_night ) ) {
-        can_see = false;
-    }
+
     if( can_see && wanted_range > unimpaired_range() ) {
         can_see = false;
     }
