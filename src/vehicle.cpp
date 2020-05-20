@@ -2966,6 +2966,7 @@ int vehicle::index_of_part( const vehicle_part *const part, const bool check_rem
  * @param dp The local coordinate.
  * @return The index of the part that will be displayed.
  */
+#pragma optimize("", off)
 int vehicle::part_displayed_at( const point &dp ) const
 {
     // Z-order is implicitly defined in game::load_vehiclepart, but as
@@ -3007,7 +3008,7 @@ int vehicle::part_displayed_at( const point &dp ) const
 
     return parts_in_square[top_part];
 }
-
+#pragma optimize("", on)
 int vehicle::roof_at_part( const int part ) const
 {
     std::vector<int> parts_in_square = parts_at_relative( parts[part].mount, true );
@@ -3080,6 +3081,9 @@ void vehicle::precalc_mounts( int idir, int dir, const point &pivot )
         } else {
             p.precalc[idir] = q->second;
         }
+    }
+    for( auto &f : fake_parts ) {
+        coord_translate( tdir, pivot, f.second.mount, f.second.precalc[idir] );
     }
     pivot_anchor[idir] = pivot;
     pivot_rotation[idir] = dir;
@@ -5423,6 +5427,7 @@ void vehicle::refresh()
     steering.clear();
     speciality.clear();
     floating.clear();
+    edge_parts.clear();
     alternator_load = 0;
     extra_drag = 0;
     all_wheels_on_one_axis = true;
@@ -5566,6 +5571,8 @@ void vehicle::refresh()
         rail_wheel_bounding_box.p1 = point_zero;
         rail_wheel_bounding_box.p2 = point_zero;
     }
+
+    refresh_fake_parts();
 
     // NB: using the _old_ pivot point, don't recalc here, we only do that when moving!
     precalc_mounts( 0, pivot_rotation[0], pivot_anchor[0] );
@@ -6900,3 +6907,155 @@ bool vehicle_part_with_feature_range<vpart_bitflags>::matches( const size_t part
            ( !( part_status_flag::available & required_ ) || vp.is_available() ) &&
            ( !( part_status_flag::enabled & required_ ) || vp.enabled );
 }
+#pragma optimize("", off)
+void vehicle::include_fake_parts() {
+    fake_parts_in_parts = 0;
+    for( auto fp : fake_parts ) {
+        if( fp.second.active ) {
+            std::vector<int> rel = parts_at_relative( fp.second.mirror_of, true );
+            for( int other :  rel) {
+                vehicle_part o( parts[other] );
+                o.mount = fp.second.mount;
+                o.precalc = fp.second.precalc;
+                parts.push_back( o );
+                fake_parts_in_parts++;
+            }
+            relative_parts.emplace( fp.second.mount, rel );
+        }
+    }
+}
+#pragma optimize("", on)
+
+#pragma optimize("", off)
+void vehicle::remove_fake_parts() {
+    while( fake_parts_in_parts > 0 ) {
+        relative_parts.erase( parts.back().mount );
+        parts.pop_back();
+        fake_parts_in_parts--;
+    }
+    for( auto fake : fake_parts ) {
+        fake.second.active = false;
+    }
+}
+#pragma optimize("", on)
+
+#pragma optimize("", off)
+void vehicle::update_padding() {
+    /*
+    *       orthogonal dir left (-Y)
+    *            ^
+    *       -X ------->  +X (forward)
+    *            v
+    *       orthogonal dir right (+Y)
+    */
+    static point veh_forward( 1, 0 );
+    static point veh_back( -1, 0 );
+    static point veh_left( 0, -1 );
+    static point veh_right( 0, 1 );
+    remove_fake_parts();
+    int active = 0;
+
+    if( turn_dir == 90 || turn_dir == 180 || turn_dir == 270 || turn_dir == 0 )
+        return;
+    // loop over alle edge parts and check if any of their cardinal neighbors have been skewed
+    // activate a fake_part to plug the gap if so
+    for( auto const &ep : edge_parts ) {
+        vehicle_part vp = parts[ep.first];
+        vpart_cardinal_neighbors neighbors = ep.second;
+        if( neighbors.forward != -1 ) {
+            int dx = std::abs( vp.precalc[0].x - parts[neighbors.forward].precalc[0].x );
+            int dy = std::abs( vp.precalc[0].y - parts[neighbors.forward].precalc[0].y );
+            if( dx == 1 && dy == 1 ) {
+                fake_parts[vp.mount].active = true;
+            }
+        }
+        if( neighbors.back != -1 ) {
+            int dx = std::abs( vp.precalc[0].x - parts[neighbors.back].precalc[0].x );
+            int dy = std::abs( vp.precalc[0].y - parts[neighbors.back].precalc[0].y );
+            if( dx == 1 && dy == 1 ) {
+                fake_parts[vp.mount].active = true;
+            }
+        }
+        if( neighbors.right != -1 ) {
+            int dx = std::abs( vp.precalc[0].x - parts[neighbors.right].precalc[0].x );
+            int dy = std::abs( vp.precalc[0].y - parts[neighbors.right].precalc[0].y );
+            if( dx == 1 && dy == 1 ) {
+
+            }
+        }
+        if( neighbors.left != -1 ) {
+            int dx = std::abs( vp.precalc[0].x - parts[neighbors.left].precalc[0].x );
+            int dy = std::abs( vp.precalc[0].y - parts[neighbors.left].precalc[0].y );
+            if( dx == 1 && dy == 1 ) {
+                //fake_parts[vp.mount].active = true;
+            }
+        }
+    }
+    active_fake_part_count = active;
+    include_fake_parts();
+    precalc_mounts( 0, pivot_rotation[0], pivot_anchor[0] );
+
+}
+#pragma optimize("", on)
+
+#pragma optimize("", off)
+int vehicle::part_at_mount( const point &mount ) const {
+    for( int i = 0; i < parts.size(); ++i ) {
+        if( parts[i].mount == mount )
+            return i;
+    }
+    return -1;
+}
+
+void vehicle::refresh_fake_parts() {
+    /*
+     *       orthogonal dir left (-Y)
+     *            ^
+     *       -X ------->  +X (forward)
+     *            v
+     *       orthogonal dir right (+Y)
+     */
+    static point veh_forward( 1, 0 );
+    static point veh_back( -1, 0 );
+    static point veh_left( 0, -1 );
+    static point veh_right( 0, 1 );
+    for( auto r : relative_parts ) {
+        point mp = r.first;
+        int part = part_at_mount( mp );
+        int forward = part_at_mount( r.first + veh_forward );
+        int back = part_at_mount( r.first + veh_back );
+        int right = part_at_mount( r.first + veh_right );
+        int left = part_at_mount( r.first + veh_left );
+        if( forward == -1 || back == -1 || left == -1 || right == -1 ) {
+            
+            edge_parts.emplace( part, vpart_cardinal_neighbors( forward, back, right, left ) );
+            if( forward == -1 ) {
+                fake_vehicle_part fp( r.first + veh_forward, mp, part, false );
+                fake_parts.emplace( fp.mirror_of, fp );
+            }
+            if( back == -1 ) {
+                fake_vehicle_part fp( r.first + veh_back, mp, part, false );
+                fake_parts.emplace( fp.mirror_of, fp );
+            }
+            if( left == -1 ) {
+                fake_vehicle_part fp( r.first + veh_left, mp, part, false );
+                fake_parts.emplace( fp.mirror_of, fp );
+            }
+            if( right == -1 ) {
+                fake_vehicle_part fp( r.first + veh_right, mp, part, false );
+                fake_parts.emplace( fp.mirror_of, fp );
+            }
+        }
+    }
+    update_padding();
+}
+#pragma optimize("", on)
+
+#pragma optimize("", off)
+bool vehicle::is_fake( const point &mount ) const {
+    for( auto f : fake_parts ) {
+        if( f.second.mount == mount )
+            return true;
+    }
+}
+#pragma optimize("", on)

@@ -178,6 +178,33 @@ int vmiph_to_cmps( int vmiph );
 static constexpr float accel_g = 9.81f;
 
 /**
+ * Structure describing a vehicle part's cardinal neighbors
+ */
+struct vpart_cardinal_neighbors {
+    int forward = -1;
+    int back = -1;
+    int right = -1;
+    int left = -1;
+    vpart_cardinal_neighbors() : vpart_cardinal_neighbors( -1, -1, -1, -1 ) {}
+    vpart_cardinal_neighbors( int forward_index, int back_index, int right_index, int left_index ) :
+        forward( forward_index ), back( back_index ), right( right_index ), left( left_index ) {}
+};
+
+struct fake_vehicle_part {
+    bool active;
+    // mount point for this fake_vehicle_part
+    point mount;
+    // the mount point that this part mirrors
+    point mirror_of;
+    int mirror_of_index;
+    std::array<point, 2> precalc = { { point( -1, -1 ), point( -1, -1 ) } };
+
+    fake_vehicle_part() : active( false ), mount( point_zero ), mirror_of( point_zero ), mirror_of_index(-1) {}
+    fake_vehicle_part( point mount, point mirror_of, int mirror_of_index, bool active = false ) :
+        mount( mount ), mirror_of( mirror_of ), active( active ), mirror_of_index( mirror_of_index ) {}
+};
+
+/**
  * Structure, describing vehicle part (i.e., wheel, seat)
  */
 struct vehicle_part {
@@ -680,7 +707,6 @@ class vehicle
 
         //Refresh all caches and re-locate all parts
         void refresh();
-
         // Do stuff like clean up blood and produce smoke from broken parts. Returns false if nothing needs doing.
         bool do_environmental_effects();
 
@@ -740,7 +766,6 @@ class vehicle
         /** Disable or enable refresh() ; used to speed up performance when creating a vehicle */
         void suspend_refresh();
         void enable_refresh();
-
         /**
          * Set stat for part constrained by range [0,durability]
          * @note does not invoke base @ref item::on_damage callback
@@ -1743,7 +1768,6 @@ class vehicle
         // List of parts that will not be on a vehicle very often, or which only one will be present
         std::vector<int> speciality;
         std::vector<int> floating;         // List of parts that provide buoyancy to boats
-
         // config values
         std::string name;   // vehicle name
         /**
@@ -1909,6 +1933,34 @@ class vehicle
 
         // destination for exhaust emissions
         tripoint exhaust_dest( int part ) const;
+
+/*
+ *  Stuff related to maintaining fake parts for padding vehicles when turned at angles 
+ *  This stuff is messy, hacky and in some cases expose the inner workings of faked vehicle parts
+ *  to the rest of the world. Mostly map.. always map.
+ */
+    public:
+        // refreshes padding tiles that block vision and navigation when vehicle is at an angle
+        void update_padding();
+
+    private:
+        int part_at_mount( const point &mount ) const;
+        // called in Refresh(). Sets up the fake parts needed for padding
+         // Adds all active fake parts to the parts vector. Do please remember to call remove_fake_parts() after
+        void include_fake_parts();
+        // Removes all fake parts from the parts vector
+        void remove_fake_parts();
+        void refresh_fake_parts();
+        // parts that exist on the edge of the vehicle and neighbor info
+        std::map<int, vpart_cardinal_neighbors> edge_parts;
+        // used to fill gaps in the vehicle if it is turned at an angle
+        std::map<point, fake_vehicle_part> fake_parts;
+        size_t active_fake_part_count = 0;
+        size_t fake_parts_in_parts = 0;
+        size_t fake_parts_in_relative = 0;
+        size_t real_parts_in_parts = 0;
+        bool parts_vector_contains_fake = false;
+        bool is_fake( const point &mount ) const;
 };
 
 #endif // CATA_SRC_VEHICLE_H
