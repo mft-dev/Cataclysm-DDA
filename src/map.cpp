@@ -1157,6 +1157,7 @@ bool map::displace_vehicle( vehicle &veh, const tripoint &dp )
 
     veh.pos = dst_offset;
     veh.sm_pos.z = p2.z;
+    veh.update_padding();
     // Invalidate vehicle's point cache
     veh.occupied_cache_time = calendar::before_time_starts;
     if( src_submap != dst_submap ) {
