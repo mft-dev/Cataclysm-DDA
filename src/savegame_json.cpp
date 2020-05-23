@@ -2835,7 +2835,14 @@ void vehicle::serialize( JsonOut &json ) const
     json.member( "owner", owner );
     json.member( "old_owner", old_owner );
     json.member( "theft_time", theft_time );
-    json.member( "parts", parts );
+    std::vector<vehicle_part> real_parts;
+    real_parts.reserve( parts.size() - fake_parts_in_parts );
+    for( auto const &p : parts ) {
+        if( !is_fake( p.mount ) ) {
+            real_parts.push_back( p );
+        }
+    }
+    json.member( "parts", real_parts );
     json.member( "tags", tags );
     json.member( "labels", labels );
     json.member( "zones" );
