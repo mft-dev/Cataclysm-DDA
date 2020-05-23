@@ -188,10 +188,27 @@ struct vpart_cardinal_neighbors {
     vpart_cardinal_neighbors() : vpart_cardinal_neighbors( -1, -1, -1, -1 ) {}
     vpart_cardinal_neighbors( int forward_index, int back_index, int right_index, int left_index ) :
         forward( forward_index ), back( back_index ), right( right_index ), left( left_index ) {}
+    std::vector<int> get_neightbors() const {
+        std::vector<int> n;
+        if( forward >= 0 ) {
+            n.emplace_back( forward );
+        }
+        if( back >= 0 ) {
+            n.emplace_back( back );
+        }
+        if( left >= 0 ) {
+            n.emplace_back( left );
+        }
+        if( right >= 0 ) {
+            n.emplace_back( right );
+        }
+        return n;
+    }
 };
 
 struct fake_vehicle_part {
     bool active;
+    bool installed = false;
     // mount point for this fake_vehicle_part
     point mount;
     // the mount point that this part mirrors
@@ -1952,13 +1969,19 @@ class vehicle
         void update_padding();
 
     private:
+        // returns the index of the first part at the given mount point
+        // -1 is returnd if the mount point is not valid
         int part_at_mount( const point &mount ) const;
+        int part_at_precalc( const point &precalc, int precalc_index ) const;
         // called in Refresh(). Sets up the fake parts needed for padding
          // Adds all active fake parts to the parts vector. Do please remember to call remove_fake_parts() after
         void include_fake_parts();
         // Removes all fake parts from the parts vector
         void remove_fake_parts();
+        void update_fake_parts();
         void refresh_fake_parts();
+        // tests whether the given precalc point is owned by a fake part. if true, sets fake_mount to the part's mount point
+        bool get_fake_mount_for_precalc_point( point pp, point &fake_mount, int precalc_index ) const;
         // parts that exist on the edge of the vehicle and neighbor info
         std::map<int, vpart_cardinal_neighbors> edge_parts;
         // used to fill gaps in the vehicle if it is turned at an angle
@@ -1969,6 +1992,7 @@ class vehicle
         size_t real_parts_in_parts = 0;
         bool parts_vector_contains_fake = false;
         bool is_fake( const point &mount ) const;
+        bool is_fake( int index ) const;
 };
 
 #endif // CATA_SRC_VEHICLE_H
