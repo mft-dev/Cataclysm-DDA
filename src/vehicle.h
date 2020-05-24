@@ -178,6 +178,38 @@ int vmiph_to_cmps( int vmiph );
 static constexpr float accel_g = 9.81f;
 
 /**
+ * Struture, describing a fake vehicle mount point
+ */
+struct fake_vehicle_mount {
+    point mount;
+    point copy_of;
+    bool active;
+    int visible_part;
+    std::array<point, 2> precalc = { { point( -1, -1 ), point( -1, -1 ) } };
+
+    fake_vehicle_mount() :
+        mount( point_zero ), copy_of( point_zero ), visible_part( -1 ), active( false ) {}
+    fake_vehicle_mount( const point &mount, const point &copy_of, int visible_part,
+                        bool active ) :
+        mount( mount ), copy_of( copy_of ), visible_part( visible_part ), active( active ) {}
+};
+
+struct mount_edge_data {
+    int forward;
+    int back;
+    int left;
+    int right;
+
+    mount_edge_data(): forward( -1 ), back( -1 ), left( -1 ), right( -1 ) {}
+    mount_edge_data( int f, int b, int l, int r ) :
+        forward( f ), back( b ), left( l ), right( r ) {}
+
+    bool is_edge_mount() {
+        return forward == -1 || back == -1 || left == -1 || right == -1;
+    }
+};
+
+/**
  * Structure, describing vehicle part (i.e., wheel, seat)
  */
 struct vehicle_part {
@@ -1917,6 +1949,22 @@ class vehicle
 
         // destination for exhaust emissions
         tripoint exhaust_dest( int part ) const;
+
+        /*
+         * Fake vehicle parts for filling gaps when at an angle
+         */
+    private:
+        void refresh_fake_mounts();
+        mount_edge_data get_edge_data( const point &mount ) const;
+        void update_active_fake_mounts();
+        std::map<point, fake_vehicle_mount> fake_mounts;
+        std::map<point, mount_edge_data> edges;
+        std::vector<vehicle_part> fake_parts;
+    public:
+        std::vector<vehicle_part> all_parts_incl_fake;
+        std::vector<vehicle_part> get_all_parts_incl_fake() const;
+        bool is_part_index_fake( const int index ) const;
+        void update_padding();
 };
 
 #endif // CATA_SRC_VEHICLE_H

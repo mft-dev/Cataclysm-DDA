@@ -152,7 +152,8 @@ map::map( int mapsize, bool zlev )
     zlevels = zlev;
     if( zlevels ) {
         grid.resize( static_cast<size_t>( my_MAPSIZE * my_MAPSIZE * OVERMAP_LAYERS ), nullptr );
-    } else {
+    }
+    else {
         grid.resize( static_cast<size_t>( my_MAPSIZE * my_MAPSIZE ), nullptr );
     }
 
@@ -172,7 +173,7 @@ map::~map() = default;
 
 static submap null_submap;
 
-maptile map::maptile_at( const tripoint &p ) const
+maptile map::maptile_at( const tripoint & p ) const
 {
     if( !inbounds( p ) ) {
         return maptile( &null_submap, 0, 0 );
@@ -181,7 +182,7 @@ maptile map::maptile_at( const tripoint &p ) const
     return maptile_at_internal( p );
 }
 
-maptile map::maptile_at( const tripoint &p )
+maptile map::maptile_at( const tripoint & p )
 {
     if( !inbounds( p ) ) {
         return maptile( &null_submap, 0, 0 );
@@ -190,7 +191,7 @@ maptile map::maptile_at( const tripoint &p )
     return maptile_at_internal( p );
 }
 
-maptile map::maptile_at_internal( const tripoint &p ) const
+maptile map::maptile_at_internal( const tripoint & p ) const
 {
     point l;
     submap *const sm = get_submap_at( p, l );
@@ -198,7 +199,7 @@ maptile map::maptile_at_internal( const tripoint &p ) const
     return maptile( sm, l );
 }
 
-maptile map::maptile_at_internal( const tripoint &p )
+maptile map::maptile_at_internal( const tripoint & p )
 {
     point l;
     submap *const sm = get_submap_at( p, l );
@@ -212,11 +213,11 @@ VehicleList map::get_vehicles()
 {
     if( !zlevels ) {
         return get_vehicles( tripoint( 0, 0, abs_sub.z ),
-                             tripoint( SEEX * my_MAPSIZE, SEEY * my_MAPSIZE, abs_sub.z ) );
+            tripoint( SEEX * my_MAPSIZE, SEEY * my_MAPSIZE, abs_sub.z ) );
     }
 
     return get_vehicles( tripoint( 0, 0, -OVERMAP_DEPTH ),
-                         tripoint( SEEX * my_MAPSIZE, SEEY * my_MAPSIZE, OVERMAP_HEIGHT ) );
+        tripoint( SEEX * my_MAPSIZE, SEEY * my_MAPSIZE, OVERMAP_HEIGHT ) );
 }
 
 void map::reset_vehicle_cache( const int zlev )
@@ -230,7 +231,7 @@ void map::reset_vehicle_cache( const int zlev )
     }
 }
 
-void map::add_vehicle_to_cache( vehicle *veh )
+void map::add_vehicle_to_cache( vehicle * veh )
 {
     if( veh == nullptr ) {
         debugmsg( "Tried to add null vehicle to cache" );
@@ -240,7 +241,8 @@ void map::add_vehicle_to_cache( vehicle *veh )
     auto &ch = get_cache( veh->sm_pos.z );
     ch.veh_in_active_range = true;
     // Get parts
-    std::vector<vehicle_part> &parts = veh->parts;
+    //std::vector<vehicle_part> &parts = veh->parts;
+    std::vector<vehicle_part> &parts = veh->get_all_parts_incl_fake();
     int partid = 0;
     for( std::vector<vehicle_part>::iterator it = parts.begin(),
          end = parts.end(); it != end; ++it, ++partid ) {
@@ -1151,6 +1153,9 @@ bool map::displace_vehicle( vehicle &veh, const tripoint &dp )
     veh.shed_loose_parts();
     for( auto &prt : veh.parts ) {
         prt.precalc[0] = prt.precalc[1];
+    }
+    for( auto &fake : veh.fake_mounts ) {
+        fake.second.precalc[0] = fake.second.precalc[1];
     }
     veh.pivot_anchor[0] = veh.pivot_anchor[1];
     veh.pivot_rotation[0] = veh.pivot_rotation[1];
