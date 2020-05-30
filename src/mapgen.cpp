@@ -5598,6 +5598,7 @@ void map::draw_connections( mapgendata &dat )
     resolve_regional_terrain_and_furniture( dat );
 }
 
+#pragma optimize("",off)
 void map::place_spawns( const mongroup_id &group, const int chance,
                         const point &p1, const point &p2, const float density,
                         const bool individual, const bool friendly, const std::string &name, const int mission_id )
@@ -5643,14 +5644,23 @@ void map::place_spawns( const mongroup_id &group, const int chance,
         // Pick a monster type
         MonsterGroupResult spawn_details = MonsterGroupManager::GetResultFromGroup( group, &num );
 
+        /* OK. This part is slightly awkward. MonsterGroupEntry has spawn_data while MonsterGroupResult does not.
+         * In order to support spawning monsters with ammo, we need their MonsterGroupEntry.
+         * However, this does not work if the selected monster isn't in the monsters array,
+         * this happens when the defaultMonster is selected in a group (default monster is not a MonsterGroupEntry)
+         *
+         * Solution: we try to find the monster in the array, then take their spawn_data, otherwise
+         * just use the default constructor
+         */
         const MonsterGroup &mg = group.obj();
         auto mon_selected = std::find_if( mg.monsters.begin(), mg.monsters.end(),
         [spawn_details]( const MonsterGroupEntry & mon ) {
             return mon.name == spawn_details.name;
         } );
+        spawn_data sd = mon_selected == mg.monsters.end() ? spawn_data() : mon_selected->data;
 
         add_spawn( spawn_details.name, spawn_details.pack_size, { x, y, abs_sub.z },
-                   friendly, -1, mission_id, name, mon_selected->data );
+                   friendly, -1, mission_id, name, sd );
     }
 }
 
