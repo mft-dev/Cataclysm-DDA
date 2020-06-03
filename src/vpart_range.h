@@ -108,7 +108,7 @@ class generic_vehicle_part_range
         // Templated because see top of file.
         template<typename T = ::vehicle>
         size_t part_count() const {
-            return static_cast<const T &>( vehicle_.get() ).parts.size();
+            return static_cast<const T &>( vehicle_.get() ).part_count();
         }
 
         using iterator = vehicle_part_iterator<range_type>;
@@ -146,6 +146,28 @@ class vehicle_part_range : public generic_vehicle_part_range<vehicle_part_range>
 
         bool matches( const size_t /*part*/ ) const {
             return true;
+        }
+};
+/** A range that contains all parts of the vehicle that matches the predicate */
+class vehicle_part_range_with : public generic_vehicle_part_range<vehicle_part_range_with>
+{
+
+    private:
+        std::function<bool( const vehicle_part & )> predicate_;
+
+    public:
+        vehicle_part_range_with( ::vehicle &v,
+                                 std::function<bool( const vehicle_part & )> predicate ) : generic_vehicle_part_range( v ),
+            predicate_( predicate ) { }
+
+        bool matches( const size_t part ) const {
+            return predicate_( vehicle().get_part( part ) );
+        }
+
+        // returns the number of vehicle_parts that match the predicate
+        // TODO: find a better way to do this.
+        size_t match_count() const {
+            return vehicle().part_count( predicate_ );
         }
 };
 

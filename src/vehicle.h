@@ -53,6 +53,7 @@ enum vpart_bitflags : int;
 enum ter_bitflags : int;
 template<typename feature_type>
 class vehicle_part_with_feature_range;
+class vehicle_part_range_with;
 
 namespace catacurses
 {
@@ -1730,8 +1731,16 @@ class vehicle
         // Cached points occupied by the vehicle
         std::set<tripoint> occupied_points;
 
-    public:
         std::vector<vehicle_part> parts;   // Parts which occupy different tiles
+    public:
+        vehicle_part get_part( const int part_key ) const;
+        vehicle_part &get_part_mutable( const int part_key );
+        bool parts_any_of( std::function<bool( const vehicle_part & )> predicate ) const;
+        vehicle_part_range_with get_parts_matching( std::function<bool( const vehicle_part & )> predicate ) const;
+        void erase_part( const int part_key );
+        size_t part_count() const;
+        size_t part_count( std::function<bool( const vehicle_part & )> predicate ) const;
+
         std::vector<tripoint> omt_path; // route for overmap-scale auto-driving
         std::vector<int> alternators;      // List of alternator indices
         std::vector<int> engines;          // List of engine indices
