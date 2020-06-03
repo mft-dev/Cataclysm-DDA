@@ -83,6 +83,7 @@
 #include "visitable.h"
 #include "vitamin.h"
 #include "vpart_position.h"
+#include "vpart_range.h"
 #include "weather.h"
 
 static const activity_id ACT_FIRSTAID( "ACT_FIRSTAID" );
@@ -645,10 +646,10 @@ int unfold_vehicle_iuse::use( player &p, item &it, bool, const tripoint & ) cons
     veh_data.str( data );
     if( !data.empty() && data[0] >= '0' && data[0] <= '9' ) {
         // starts with a digit -> old format
-        for( auto &elem : veh->parts ) {
+        for( const vpart_reference elem : veh->get_all_parts() ) {
             int tmp;
             veh_data >> tmp;
-            veh->set_hp( elem, tmp );
+            veh->set_hp( elem.part(), tmp );
         }
     } else {
         try {
@@ -657,9 +658,9 @@ int unfold_vehicle_iuse::use( player &p, item &it, bool, const tripoint & ) cons
             // cached values (like precalc, passenger_id, ...)
             std::vector<vehicle_part> parts;
             json.read( parts );
-            for( size_t i = 0; i < parts.size() && i < veh->parts.size(); i++ ) {
+            for( size_t i = 0; i < parts.size() && i < veh->part_count(); i++ ) {
                 const vehicle_part &src = parts[i];
-                vehicle_part &dst = veh->parts[i];
+                vehicle_part &dst = veh->get_part( i );
                 // and now only copy values, that are
                 // expected to be consistent.
                 veh->set_hp( dst, src.hp() );

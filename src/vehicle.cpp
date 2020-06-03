@@ -152,7 +152,7 @@ class DefaultRemovePartHandler : public RemovePartHandler
 
             if( g->u.get_grab_type() == object_type::VEHICLE &&
                 g->u.grab_point == veh.global_part_pos3( part ) ) {
-                if( veh.parts_at_relative( veh.parts[part].mount, false ).empty() ) {
+                if( veh.parts_at_relative( veh.get_part( part ).mount, false ).empty() ) {
                     add_msg( m_info, _( "The vehicle part you were holding has been destroyed!" ) );
                     g->u.grab( object_type::NONE );
                 }
@@ -223,9 +223,9 @@ void vehicle_stack::insert( const item &newitem )
 
 units::volume vehicle_stack::max_volume() const
 {
-    if( myorigin->part_flag( part_num, "CARGO" ) && !myorigin->parts[part_num].is_broken() ) {
+    if( myorigin->part_flag( part_num, "CARGO" ) && !myorigin->get_part( part_num ).is_broken() ) {
         // Set max volume for vehicle cargo to prevent integer overflow
-        return std::min( myorigin->parts[part_num].info().size, 10000_liter );
+        return std::min( myorigin->get_part( part_num ).info().size, 10000_liter );
     }
     return 0_ml;
 }
@@ -6118,7 +6118,7 @@ bool vpart_position::is_inside() const
     // this should be called elsewhere and not in a function that intends to just query
     // it's also a no-op if the insides are up to date.
     vehicle().refresh_insides();
-    return vehicle().parts[part_index()].inside;
+    return vehicle().get_part( part_index() ).inside;
 }
 
 void vehicle::unboard_all()
@@ -6540,7 +6540,7 @@ std::set<tripoint> &vehicle::get_points( const bool force_refresh )
 vehicle_part &vpart_reference::part() const
 {
     assert( part_index() < vehicle().parts.size() );
-    return vehicle().parts[part_index()];
+    return vehicle().get_part( part_index() );
 }
 
 const vpart_info &vpart_reference::info() const
@@ -6555,7 +6555,7 @@ player *vpart_reference::get_passenger() const
 
 point vpart_position::mount() const
 {
-    return vehicle().parts[part_index()].mount;
+    return vehicle().get_part( part_index() ).mount;
 }
 
 tripoint vpart_position::pos() const
@@ -6912,7 +6912,7 @@ tripoint vehicle::exhaust_dest( int part ) const
 template<>
 bool vehicle_part_with_feature_range<std::string>::matches( const size_t part ) const
 {
-    const vehicle_part &vp = this->vehicle().parts[part];
+    const vehicle_part &vp = this->vehicle().get_part( part );
     return vp.info().has_flag( feature_ ) &&
            !vp.removed &&
            ( !( part_status_flag::working & required_ ) || !vp.is_broken() ) &&
@@ -6923,10 +6923,61 @@ bool vehicle_part_with_feature_range<std::string>::matches( const size_t part ) 
 template<>
 bool vehicle_part_with_feature_range<vpart_bitflags>::matches( const size_t part ) const
 {
-    const vehicle_part &vp = this->vehicle().parts[part];
+    const vehicle_part &vp = this->vehicle().get_part( part );
     return vp.info().has_flag( feature_ ) &&
            !vp.removed &&
            ( !( part_status_flag::working & required_ ) || !vp.is_broken() ) &&
            ( !( part_status_flag::available & required_ ) || vp.is_available() ) &&
            ( !( part_status_flag::enabled & required_ ) || vp.enabled );
 }
+
+/*
+ * Infrastructure rework: privatixing parts vector
+*/
+#pragma optimize("",off)
+vehicle_part vehicle::get_part( const int part_key ) const
+{
+    static vehicle_part null_part;
+    if( part_key >= 0 && part_key < parts.size() ) {
+        return parts[part_key];
+    }
+    debugmsg( "Tried to access vechile part out of bounds" );
+    return null_part;
+}
+vehicle_part &vehicle::get_part_mutable( const int part_key )
+{
+    static vehicle_part null_part;
+    if( part_key >= 0 && part_key < parts.size() ) {
+        return parts[part_key];
+    }
+    debugmsg( "Tried to access vechile part out of bounds" );
+    return null_part;
+}
+size_t vehicle::part_count() const
+{
+    return parts.size();
+}
+
+size_t vehicle::part_count( std::function<bool( const vehicle_part & )> predicate ) const
+{
+    return std::count( parts.begin(), parts.end(), predicate );
+}
+
+void vehicle::erase_part( const int part_key )
+{
+    if( parts.size() < part_key ) {
+        parts.erase( parts.begin() + part_key );
+    }
+}
+
+bool vehicle::parts_any_of( std::function<bool( const vehicle_part & )> predicate ) const
+{
+    return std::any_of( parts.begin(), parts.end(), predicate );
+}
+
+vehicle_part_range_with vehicle::get_parts_matching( std::function<bool( const vehicle_part & )> predicate ) const
+{
+    return vehicle_part_range_with( const_cast<vehicle &>( *this ), predicate );
+}
+
+#pragma optimize("",on)
