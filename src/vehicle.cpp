@@ -6960,7 +6960,13 @@ size_t vehicle::part_count() const
 
 size_t vehicle::part_count( std::function<bool( const vehicle_part & )> predicate ) const
 {
-    return std::count( parts.begin(), parts.end(), predicate );
+    size_t count = 0;
+    for( const vehicle_part &vp : parts ) {
+        if( predicate( vp ) ) {
+            count++;
+        }
+    }
+    return count;
 }
 
 void vehicle::erase_part( const int part_key )
@@ -6972,7 +6978,12 @@ void vehicle::erase_part( const int part_key )
 
 bool vehicle::parts_any_of( std::function<bool( const vehicle_part & )> predicate ) const
 {
-    return std::any_of( parts.begin(), parts.end(), predicate );
+    for( const vehicle_part &vp : parts ) {
+        if( predicate( vp ) ) {
+            return true;
+        }
+    }
+    return false;
 }
 
 vehicle_part_range_with vehicle::get_parts_matching( std::function<bool( const vehicle_part & )> predicate ) const
