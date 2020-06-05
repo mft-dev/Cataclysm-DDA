@@ -31,6 +31,7 @@
 #include "tileray.h"
 #include "type_id.h"
 #include "units.h"
+#include "vpart_range.h"
 
 class Character;
 class Creature;
@@ -916,12 +917,24 @@ class vehicle
          */
         void remove_remote_part( int part_num );
         /**
+         * Returns the part with the given part_num
+         */
+        vehicle_part &part( int part_num );
+        /**
+         * Same as part(int) but with const binding
+         */
+        const vehicle_part &cpart( int part_num ) const;
+        /**
          * Yields a range containing all parts (including broken ones) that can be
          * iterated over.
          */
         // TODO: maybe not include broken ones? Have a separate function for that?
         // TODO: rename to just `parts()` and rename the data member to `parts_`.
         vehicle_part_range get_all_parts() const;
+        // Yields a range containing all parts including fake ones that only map cares about
+        vehicle_part_range get_all_parts_incl_fake() const {
+            return get_all_parts();
+        }
         /**
          * Yields a range of parts of this vehicle that each have the given feature
          * and are available: not broken, removed, or part of a carried vehicle.
@@ -1730,8 +1743,17 @@ class vehicle
         // Cached points occupied by the vehicle
         std::set<tripoint> occupied_points;
 
-    public:
         std::vector<vehicle_part> parts;   // Parts which occupy different tiles
+    public:
+        // Determines if the given part_num is valid for this vehicle
+        bool valid_part( int part_num ) const;
+        // Determines if this vehicle has any parts
+        bool has_any_parts() const;
+        // Number of parts in this vehicle
+        size_t num_parts() const;
+        // Exists solely to support faction_camp.cpp
+        void force_remove_part( int part_num );
+
         std::vector<tripoint> omt_path; // route for overmap-scale auto-driving
         std::vector<int> alternators;      // List of alternator indices
         std::vector<int> engines;          // List of engine indices

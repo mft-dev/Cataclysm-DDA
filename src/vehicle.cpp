@@ -152,7 +152,7 @@ class DefaultRemovePartHandler : public RemovePartHandler
 
             if( g->u.get_grab_type() == object_type::VEHICLE &&
                 g->u.grab_point == veh.global_part_pos3( part ) ) {
-                if( veh.parts_at_relative( veh.parts[part].mount, false ).empty() ) {
+                if( veh.parts_at_relative( veh.part( part ).mount, false ).empty() ) {
                     add_msg( m_info, _( "The vehicle part you were holding has been destroyed!" ) );
                     g->u.grab( object_type::NONE );
                 }
@@ -223,9 +223,9 @@ void vehicle_stack::insert( const item &newitem )
 
 units::volume vehicle_stack::max_volume() const
 {
-    if( myorigin->part_flag( part_num, "CARGO" ) && !myorigin->parts[part_num].is_broken() ) {
+    if( myorigin->part_flag( part_num, "CARGO" ) && !myorigin->part( part_num ).is_broken() ) {
         // Set max volume for vehicle cargo to prevent integer overflow
-        return std::min( myorigin->parts[part_num].info().size, 10000_liter );
+        return std::min( myorigin->part( part_num ).info().size, 10000_liter );
     }
     return 0_ml;
 }
@@ -6118,7 +6118,7 @@ bool vpart_position::is_inside() const
     // this should be called elsewhere and not in a function that intends to just query
     // it's also a no-op if the insides are up to date.
     vehicle().refresh_insides();
-    return vehicle().parts[part_index()].inside;
+    return vehicle().part( part_index() ).inside;
 }
 
 void vehicle::unboard_all()
@@ -6540,7 +6540,7 @@ std::set<tripoint> &vehicle::get_points( const bool force_refresh )
 vehicle_part &vpart_reference::part() const
 {
     assert( part_index() < vehicle().parts.size() );
-    return vehicle().parts[part_index()];
+    return vehicle().part( part_index() );
 }
 
 const vpart_info &vpart_reference::info() const
@@ -6555,7 +6555,7 @@ player *vpart_reference::get_passenger() const
 
 point vpart_position::mount() const
 {
-    return vehicle().parts[part_index()].mount;
+    return vehicle().part( part_index() ).mount;
 }
 
 tripoint vpart_position::pos() const
@@ -6848,6 +6848,36 @@ bounding_box vehicle::get_bounding_box()
     return b;
 }
 
+bool vehicle::valid_part( int part_num ) const
+{
+    return part_num >= 0 && part_num < parts.size();
+}
+bool vehicle::has_any_parts() const
+{
+    return parts.size() > 0;
+}
+
+size_t vehicle::num_parts() const
+{
+    return parts.size();
+}
+const vehicle_part &vehicle::cpart( int part_num ) const
+{
+    return const_cast<vehicle_part &>( parts[part_num] );
+}
+
+
+vehicle_part &vehicle::part( int part_num )
+{
+    vehicle_part &vp = parts[part_num];
+    return vp;
+}
+
+void vehicle::force_remove_part( int part_num )
+{
+    parts.erase( parts.begin() + part_num );
+}
+
 vehicle_part_range vehicle::get_all_parts() const
 {
     return vehicle_part_range( const_cast<vehicle &>( *this ) );
@@ -6912,7 +6942,7 @@ tripoint vehicle::exhaust_dest( int part ) const
 template<>
 bool vehicle_part_with_feature_range<std::string>::matches( const size_t part ) const
 {
-    const vehicle_part &vp = this->vehicle().parts[part];
+    const vehicle_part &vp = this->vehicle().part( part );
     return vp.info().has_flag( feature_ ) &&
            !vp.removed &&
            ( !( part_status_flag::working & required_ ) || !vp.is_broken() ) &&
@@ -6923,7 +6953,7 @@ bool vehicle_part_with_feature_range<std::string>::matches( const size_t part ) 
 template<>
 bool vehicle_part_with_feature_range<vpart_bitflags>::matches( const size_t part ) const
 {
-    const vehicle_part &vp = this->vehicle().parts[part];
+    const vehicle_part &vp = this->vehicle().part( part );
     return vp.info().has_flag( feature_ ) &&
            !vp.removed &&
            ( !( part_status_flag::working & required_ ) || !vp.is_broken() ) &&
