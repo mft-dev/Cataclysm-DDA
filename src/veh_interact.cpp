@@ -1546,7 +1546,8 @@ void veh_interact::calc_overview()
 
     for( const vpart_reference &vpr : veh->get_all_parts() ) {
         if( vpr.part().is_turret() && vpr.part().is_available() ) {
-            overview_opts.emplace_back( "TURRET", &vpr.part(), next_hotkey( vpr.part(), hotkey ), details_ammo );
+            overview_opts.emplace_back( "TURRET", &vpr.part(), next_hotkey( vpr.part(), hotkey ),
+                                        details_ammo );
         }
     }
 
@@ -3150,29 +3151,29 @@ void veh_interact::complete_vehicle( player &p )
                 }
                 veh->tow_data.clear_towing();
             }
-            bool broken = veh->parts[ vehicle_part ].is_broken();
-            bool smash_remove = veh->parts[vehicle_part].info().has_flag( "SMASH_REMOVE" );
+            bool broken = veh->part( vehicle_part ).is_broken();
+            bool smash_remove = veh->part( vehicle_part ).info().has_flag( "SMASH_REMOVE" );
 
             if( broken ) {
                 p.add_msg_if_player( _( "You remove the broken %1$s from the %2$s." ),
-                                     veh->parts[ vehicle_part ].name(), veh->name );
+                                     veh->part( vehicle_part ).name(), veh->name );
             } else if( smash_remove ) {
                 p.add_msg_if_player( _( "You smash the %1$s to bits, removing it from the %2$s." ),
-                                     veh->parts[ vehicle_part ].name(), veh->name );
+                                     veh->part( vehicle_part ).name(), veh->name );
             } else {
                 p.add_msg_if_player( _( "You remove the %1$s from the %2$s." ),
                                      veh->part( vehicle_part ).name(), veh->name );
             }
 
             if( broken ) {
-                item_group::ItemList pieces = veh->parts[vehicle_part].pieces_for_broken_part();
+                item_group::ItemList pieces = veh->part( vehicle_part ).pieces_for_broken_part();
                 resulting_items.insert( resulting_items.end(), pieces.begin(), pieces.end() );
             } else {
                 if( smash_remove ) {
-                    item_group::ItemList pieces = veh->parts[vehicle_part].pieces_for_broken_part();
+                    item_group::ItemList pieces = veh->part( vehicle_part ).pieces_for_broken_part();
                     resulting_items.insert( resulting_items.end(), pieces.begin(), pieces.end() );
                 } else {
-                    resulting_items.push_back( veh->parts[vehicle_part].properties_to_item() );
+                    resulting_items.push_back( veh->part( vehicle_part ).properties_to_item() );
                 }
                 for( const std::pair<const skill_id, int> &sk : vpinfo.install_skills ) {
                     // removal is half as educational as installation
