@@ -116,6 +116,33 @@ struct veh_collision {
 
     veh_collision() = default;
 };
+struct vpart_edge_info {
+    int forward;
+    int back;
+    int left;
+    int right;
+    vpart_edge_info() : forward( -1 ), back( -1 ), left( -1 ), right( -1 ) {}
+    vpart_edge_info( int forward, int back, int left, int right ) :
+        forward( forward ), back( back ), left( left ), right( right ) {}
+
+    bool is_edge_mount() {
+        return forward == -1 || back == -1 || left == -1 || right == -1;
+    }
+};
+struct fake_vehicle_mount {
+    point mount;
+    point copy_of;
+    bool active;
+    int visible_part; // the part this is a copy of
+    int fake_part_index = -1; // index of the fake part
+    std::array<point, 2> precalc = { { point( -1, -1 ), point( -1, -1 ) } };
+
+    fake_vehicle_mount() :
+        mount( point_zero ), copy_of( point_zero ), visible_part( -1 ), active( false ) {}
+    fake_vehicle_mount( const point &mount, const point &copy_of, int visible_part,
+                        bool active ) :
+        mount( mount ), copy_of( copy_of ), visible_part( visible_part ), active( active ) {}
+};
 
 class vehicle_stack : public item_stack
 {
@@ -932,9 +959,7 @@ class vehicle
         // TODO: rename to just `parts()` and rename the data member to `parts_`.
         vehicle_part_range get_all_parts() const;
         // Yields a range containing all parts including fake ones that only map cares about
-        vehicle_part_range get_all_parts_incl_fake() const {
-            return get_all_parts();
-        }
+        vehicle_part_incl_fake_range get_all_parts_incl_fake( bool incl_inactive = false ) const;
         /**
          * Yields a range of parts of this vehicle that each have the given feature
          * and are available: not broken, removed, or part of a carried vehicle.
@@ -973,7 +998,7 @@ class vehicle
         /**@}*/
 
         // returns the list of indices of parts at certain position (not accounting frame direction)
-        std::vector<int> parts_at_relative( const point &dp, bool use_cache ) const;
+        std::vector<int> parts_at_relative( const point &dp, bool use_cache, bool include_fake = false ) const;
 
         // returns index of part, inner to given, with certain flag, or -1
         int part_with_feature( int p, const std::string &f, bool unbroken ) const;
@@ -1068,7 +1093,7 @@ class vehicle
 
         // Seek a vehicle part which obstructs tile with given coordinates relative to vehicle position
         int part_at( const point &dp ) const;
-        int part_displayed_at( const point &dp ) const;
+        int part_displayed_at( const point &dp, bool include_fake = false ) const;
         int roof_at_part( int p ) const;
 
         // Given a part, finds its index in the vehicle
@@ -1744,13 +1769,39 @@ class vehicle
         std::set<tripoint> occupied_points;
 
         std::vector<vehicle_part> parts;   // Parts which occupy different tiles
+        // Used in savegame.cpp to only save real parts to json
+        std::vector<vehicle_part> real_parts() const;
+        // Number of fake parts currently present in this vehicle
+        size_t fake_part_count = 0;
+        // Map of edge parts and their adjacency information
+        std::map<point, vpart_edge_info> edges;
+        // Fake mount points
+        std::map<point, fake_vehicle_mount> fake_mounts;
+        // For a given mount point, returns it's adjacency info
+        vpart_edge_info get_edge_info( const point &mount ) const;
+
+        // Rebuilds edges cache
+        void refresh_edge_info();
+        // Re-installs fake parts used to pad the vehicle when askew
+        void refresh_fake_parts();
+        // Removes fake parts from the parts vector
+        void remove_fake_parts();
+        int obstacle_at_mount( const point &mount ) const;
     public:
+        // Updates active state on all fake_mounts based on whether they can fill a gap
+        // map.cpp calls this in displace_vehicle
+        void update_active_fakes();
+        // copies precalc[1] into precalc[0] for all parts
+        void advance_precalc_mounts();
+        bool fake_part( int part_num ) const;
         // Determines if the given part_num is valid for this vehicle
-        bool valid_part( int part_num ) const;
+        bool valid_part( int part_num, bool include_fake = false ) const;
+        // Determines if the given part_num is real or active fake part
+        bool real_or_active_fake_part( int part_num ) const;
         // Determines if this vehicle has any parts
         bool has_any_parts() const;
         // Number of parts in this vehicle
-        size_t num_parts() const;
+        size_t num_parts( bool include_fake = false ) const;
         // Exists solely to support faction_camp.cpp
         void force_remove_part( int part_num );
 

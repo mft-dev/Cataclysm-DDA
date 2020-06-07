@@ -241,7 +241,13 @@ void map::add_vehicle_to_cache( vehicle *veh )
     ch.veh_in_active_range = true;
     // Get parts
     int partid = 0;
-    for( const vpart_reference &vpr : veh->get_all_parts_incl_fake() ) {
+    std::vector<vpart_reference> all_parts;
+
+    for( const auto &tmp : veh->get_all_parts_incl_fake() ) {
+        all_parts.push_back( tmp );
+    }
+
+    for( const vpart_reference &vpr : all_parts ) {
         if( vpr.part().removed ) {
             continue;
         }
@@ -1148,14 +1154,15 @@ bool map::displace_vehicle( vehicle &veh, const tripoint &dp )
     }
 
     veh.shed_loose_parts();
-    for( const vpart_reference &vpr : veh.get_all_parts_incl_fake() ) {
-        vpr.part().precalc[0] = vpr.part().precalc[1];
-    }
+    veh.advance_precalc_mounts();
+    veh.update_active_fakes();
+
     veh.pivot_anchor[0] = veh.pivot_anchor[1];
     veh.pivot_rotation[0] = veh.pivot_rotation[1];
 
     veh.pos = dst_offset;
     veh.sm_pos.z = p2.z;
+
     // Invalidate vehicle's point cache
     veh.occupied_cache_time = calendar::before_time_starts;
     if( src_submap != dst_submap ) {
@@ -5362,7 +5369,7 @@ void map::add_splatter( const field_type_id &type, const tripoint &where, int in
         if( const optional_vpart_position vp = veh_at( where ) ) {
             vehicle *const veh = &vp->vehicle();
             // Might be -1 if all the vehicle's parts at where are marked for removal
-            const int part = veh->part_displayed_at( vp->mount() );
+            const int part = veh->part_displayed_at( vp->mount(), true );
             if( part != -1 ) {
                 veh->part( part ).blood += 200 * std::min( intensity, 3 ) / 3;
                 return;
