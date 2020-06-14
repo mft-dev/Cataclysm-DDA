@@ -3105,7 +3105,7 @@ void veh_interact::complete_vehicle( player &p )
 
         case 'o': {
             const inventory &inv = p.crafting_inventory();
-            if( vehicle_part >= static_cast<int>( veh->num_parts() ) ) {
+            if( vehicle_part >= static_cast<int>( veh->part_count() ) ) {
                 vehicle_part = veh->get_next_shifted_index( vehicle_part, p );
                 if( vehicle_part == -1 ) {
                     p.add_msg_if_player( m_info, _( "The %s has already been removed by someone else." ),
@@ -3181,7 +3181,7 @@ void veh_interact::complete_vehicle( player &p )
                 }
             }
 
-            if( veh->num_parts() < 2 ) {
+            if( veh->part_count() < 2 ) {
                 p.add_msg_if_player( _( "You completely dismantle the %s." ), veh->name );
                 p.activity.set_to_null();
                 g->m.destroy_vehicle( veh );

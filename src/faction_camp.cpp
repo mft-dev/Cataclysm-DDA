@@ -2458,7 +2458,7 @@ bool basecamp::start_garage_chop( const point &dir, const tripoint &omt_tgt )
     //Chopping up the car!
     int prt = 0;
     int skillLevel = comp->get_skill_level( skill_mechanics );
-    while( car->num_parts() > 0 ) {
+    while( car->part_count() > 0 ) {
         vehicle_stack contents = car->get_items( prt );
         for( auto iter = contents.begin(); iter != contents.end(); ) {
             comp->companion_mission_inv.add_item( *iter );
